@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#071827">
+  <title>Quiz SRC — Egzamin radiowy</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="hero">
+    <div>
+      <p class="eyebrow">NAUKA DO EGZAMINU RADIOWEGO</p>
+      <h1>Quiz SRC</h1>
+      <p class="subtitle">350 pytań · trwały postęp · trzy działy</p>
+    </div>
+    <span id="syncState" class="sync">Łączenie z bazą…</span>
+  </header>
+
+  <main>
+    <section class="stats" aria-label="Postęp nauki">
+      <article><strong id="statMastered">—</strong><span>opanowane</span></article>
+      <article><strong id="statLearning">—</strong><span>do nauki</span></article>
+      <article><strong id="statAccuracy">—</strong><span>skuteczność</span></article>
+      <article><strong id="statAnswered">—</strong><span>odpowiedzi</span></article>
+    </section>
+
+    <nav class="tabs" aria-label="Widok aplikacji">
+      <button class="tab active" data-view="quiz">Quiz</button>
+      <button class="tab" data-view="table">Tabela pytań</button>
+    </nav>
+
+    <section id="quizView" class="view">
+      <div class="toolbar panel">
+        <label>Dział<select id="quizSection"><option value="all">Wszystkie działy</option></select></label>
+        <label>Zakres<select id="quizMode">
+          <option value="all">Wszystkie pytania</option>
+          <option value="learning">Tylko do nauki</option>
+          <option value="mastered">Tylko opanowane</option>
+          <option value="errors">Najczęściej błędne</option>
+        </select></label>
+        <button id="startRandom" class="primary">Losowa kolejność</button>
+        <button id="startSequential">Po kolei</button>
+      </div>
+
+      <div id="emptyQuiz" class="welcome panel">
+        <div class="signal">SRC</div>
+        <h2>Wybierz zakres i rozpocznij naukę</h2>
+        <p>Każda odpowiedź oraz zmiana statusu zostanie zapisana w Cloudflare D1.</p>
+      </div>
+
+      <article id="questionCard" class="question panel hidden">
+        <div class="question-meta"><span id="questionSection" class="badge"></span><span id="questionNumber"></span></div>
+        <div class="progress"><span id="progressFill"></span></div>
+        <h2 id="questionText"></h2>
+        <div id="answers" class="answers"></div>
+        <div id="feedback" class="feedback hidden"></div>
+        <div class="question-actions">
+          <button id="masterCurrent" class="master-button"></button>
+          <div><button id="prevQuestion">Wstecz</button><button id="nextQuestion" class="primary">Dalej</button></div>
+        </div>
+      </article>
+    </section>
+
+    <section id="tableView" class="view hidden">
+      <div class="toolbar panel table-tools">
+        <label class="search">Szukaj<input id="tableSearch" type="search" placeholder="Numer lub fragment pytania…"></label>
+        <label>Dział<select id="tableSection"><option value="all">Wszystkie działy</option></select></label>
+        <label>Status<select id="tableStatus">
+          <option value="all">Wszystkie</option><option value="mastered">Opanowane</option><option value="learning">Do nauki</option>
+        </select></label>
+        <span id="tableCount" class="result-count"></span>
+      </div>
+      <div class="table-wrap panel">
+        <table>
+          <thead><tr><th>Nr</th><th>Dział</th><th>Pytanie</th><th>Poprawna odpowiedź</th><th>Wyniki</th><th>Opanowane</th></tr></thead>
+          <tbody id="questionRows"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" role="status" aria-live="polite"></div>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

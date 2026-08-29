@@ -1,0 +1,15 @@
+{
+  "name": "src-quiz-cloudflare",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:local": "wrangler d1 migrations apply src-quiz --local",
+    "db:remote": "wrangler d1 migrations apply src-quiz --remote"
+  },
+  "devDependencies": {
+    "wrangler": "^4.33.1"
+  }
+}
