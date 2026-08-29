@@ -7,7 +7,7 @@ Pytania są częścią kodu aplikacji, a postęp użytkownika jest przechowywany
 
 1. Utwórz repozytorium GitHub i umieść w nim zawartość tego katalogu.
 2. W Cloudflare wybierz **Compute → Workers & Pages → Create application → Import a repository**.
-3. Utwórz bazę D1 o nazwie `src-quiz`.
+3. Utwórz bazę D1 o nazwie `src-egzam`.
 4. Skopiuj identyfikator bazy do `wrangler.jsonc` w miejsce `WKLEJ_TUTAJ_ID_BAZY`.
 5. Zastosuj migrację: `npm run db:remote`.
 6. Wdróż aplikację: `npm run deploy` albo pozwól Cloudflare zbudować ją z GitHuba.

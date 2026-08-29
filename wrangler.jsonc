@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "src-quiz",
+  "name": "src-egzam",
   "main": "src/index.js",
   "compatibility_date": "2026-08-29",
   "assets": {
@@ -11,8 +11,8 @@
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "src-quiz",
-      "database_id": "f66ac06e-8df6-442a-993a-b76710b9177e",
+      "database_name": "src-egzam",
+      "database_id": "08fdadd4-b3b0-44f9-8f19-f24b81bed672",
       "migrations_dir": "migrations"
     }
   ],
