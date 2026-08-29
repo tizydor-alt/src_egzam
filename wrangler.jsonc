@@ -12,7 +12,7 @@
     {
       "binding": "DB",
       "database_name": "src-quiz",
-      "database_id": "WKLEJ_TUTAJ_ID_BAZY",
+      "database_id": "f66ac06e-8df6-442a-993a-b76710b9177e",
       "migrations_dir": "migrations"
     }
   ],
