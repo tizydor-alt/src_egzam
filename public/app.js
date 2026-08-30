@@ -5,6 +5,7 @@ function toast(message){const el=$('#toast');el.textContent=message;el.classList
 async function api(path,options={}){const response=await fetch(path,{...options,headers:{'content-type':'application/json',...(options.headers||{})}});if(!response.ok)throw new Error((await response.json().catch(()=>({}))).error||'Błąd połączenia');return response.json()}
 function record(nr){return state.progress.get(nr)||{question_nr:nr,mastered:0,correct_count:0,wrong_count:0}}
 function isMastered(q){return Boolean(record(q.nr).mastered)}
+function scoreFor(q){const p=record(q.nr),correct=p.correct_count||0,wrong=p.wrong_count||0,attempts=correct+wrong;return{correct,wrong,attempts,percent:attempts?Math.round(correct/attempts*100):null}}
 
 async function init(){
   try{
@@ -28,20 +29,24 @@ $$('.tab').forEach(tab=>tab.addEventListener('click',()=>{$$('.tab').forEach(x=>
 
 function quizPool(){
   const section=$('#quizSection').value,mode=$('#quizMode').value;let pool=state.questions.filter(q=>section==='all'||q.dzial===section);
-  if(mode==='learning')pool=pool.filter(q=>!isMastered(q));if(mode==='mastered')pool=pool.filter(isMastered);
-  if(mode==='errors')pool=pool.filter(q=>(record(q.nr).wrong_count||0)>0).sort((a,b)=>(record(b.nr).wrong_count||0)-(record(a.nr).wrong_count||0));return pool;
+  if(mode==='learning')pool=pool.filter(q=>!isMastered(q));
+  if(mode==='mastered')pool=pool.filter(isMastered);
+  if(mode==='errors')pool=pool.filter(q=>(record(q.nr).wrong_count||0)>0).sort((a,b)=>(record(b.nr).wrong_count||0)-(record(a.nr).wrong_count||0));
+  if(mode==='lowAttempts')pool=pool.filter(q=>scoreFor(q).attempts<3).sort((a,b)=>scoreFor(a).attempts-scoreFor(b).attempts||a.nr-b.nr);
+  if(mode==='lowScore')pool=pool.filter(q=>scoreFor(q).attempts>0&&scoreFor(q).percent<70).sort((a,b)=>scoreFor(a).percent-scoreFor(b).percent||scoreFor(a).attempts-scoreFor(b).attempts);
+  return pool;
 }
 function start(shuffle){state.active=quizPool();if(!state.active.length)return toast('Brak pytań dla wybranego zakresu.');if(shuffle)state.active.sort(()=>Math.random()-.5);state.index=0;state.answered.clear();$('#emptyQuiz').classList.add('hidden');$('#questionCard').classList.remove('hidden');showQuestion()}
 $('#startRandom').addEventListener('click',()=>start(true));$('#startSequential').addEventListener('click',()=>start(false));
 
 function showQuestion(){
-  const q=state.active[state.index],chosen=state.answered.get(q.nr);$('#questionSection').textContent=q.dzial;$('#questionNumber').textContent=`Nr ${q.nr} · ${state.index+1}/${state.active.length}`;$('#progressFill').style.width=`${(state.index+1)/state.active.length*100}%`;$('#questionText').textContent=q.pytanie;
+  const q=state.active[state.index],chosen=state.answered.get(q.nr),score=scoreFor(q);$('#questionSection').textContent=q.dzial;$('#questionNumber').textContent=`Nr ${q.nr} · ${state.index+1}/${state.active.length}`;$('#questionScore').innerHTML=`<span>Próby <b>${score.attempts}</b></span><span>Poprawne <b>${score.correct}</b></span><span>Wynik <b class="${score.percent===null?'':score.percent>=70?'score-pass':'score-fail'}">${score.percent===null?'—':score.percent+'%'}</b></span>`;$('#progressFill').style.width=`${(state.index+1)/state.active.length*100}%`;$('#questionText').textContent=q.pytanie;
   $('#answers').innerHTML=['A','B','C'].map(letter=>`<button class="answer ${chosen&&letter===q.poprawna?'correct':''} ${chosen===letter&&letter!==q.poprawna?'wrong':''}" data-answer="${letter}" ${chosen?'disabled':''}><b>${letter}.</b><span>${escapeHtml(q[letter.toLowerCase()])}</span></button>`).join('');
   $$('.answer').forEach(btn=>btn.addEventListener('click',()=>answer(q,btn.dataset.answer)));const fb=$('#feedback');fb.className='feedback hidden';if(chosen)showFeedback(q,chosen);
   updateMasterButton(q);$('#prevQuestion').disabled=state.index===0;$('#nextQuestion').textContent=state.index===state.active.length-1?'Zakończ':'Dalej';
 }
 function showFeedback(q,answer){const ok=answer===q.poprawna,fb=$('#feedback');fb.className=`feedback ${ok?'ok':'bad'}`;fb.textContent=ok?'✓ Poprawna odpowiedź':`✕ Poprawna odpowiedź: ${q.poprawna}. ${q[q.poprawna.toLowerCase()]}`}
-async function answer(q,answer){state.answered.set(q.nr,answer);showQuestion();try{const result=await api('/api/answer',{method:'POST',body:JSON.stringify({questionNr:q.nr,answer})});const p=record(q.nr);p.correct_count=(p.correct_count||0)+(result.correct?1:0);p.wrong_count=(p.wrong_count||0)+(result.correct?0:1);p.last_answer=answer;state.progress.set(q.nr,p);renderStats()}catch(error){toast(error.message)}}
+async function answer(q,answer){state.answered.set(q.nr,answer);showQuestion();try{const result=await api('/api/answer',{method:'POST',body:JSON.stringify({questionNr:q.nr,answer})});const p=record(q.nr);p.correct_count=(p.correct_count||0)+(result.correct?1:0);p.wrong_count=(p.wrong_count||0)+(result.correct?0:1);p.last_answer=answer;state.progress.set(q.nr,p);renderStats();showQuestion()}catch(error){toast(error.message)}}
 $('#prevQuestion').addEventListener('click',()=>{if(state.index>0){state.index--;showQuestion()}});$('#nextQuestion').addEventListener('click',()=>{if(state.index<state.active.length-1){state.index++;showQuestion()}else{$('#questionCard').classList.add('hidden');$('#emptyQuiz').classList.remove('hidden');$('#emptyQuiz h2').textContent=`Sesja zakończona · ${state.answered.size} odpowiedzi`;$('#emptyQuiz p').textContent='Wyniki zostały zapisane w bazie D1.'}});
 
 function updateMasterButton(q){const on=isMastered(q),button=$('#masterCurrent');button.classList.toggle('on',on);button.textContent=on?'✓ Opanowane':'Oznacz jako opanowane';button.onclick=()=>setMastered(q,!on)}
@@ -62,7 +67,7 @@ async function setMastered(q,mastered){const previous=isMastered(q),p=record(q.n
 function renderTable(){
   const term=$('#tableSearch').value.trim().toLocaleLowerCase('pl'),section=$('#tableSection').value,status=$('#tableStatus').value;
   const rows=state.questions.filter(q=>(section==='all'||q.dzial===section)&&(status==='all'||(status==='mastered'&&isMastered(q))||(status==='learning'&&!isMastered(q)))&&(!term||String(q.nr)===term||q.pytanie.toLocaleLowerCase('pl').includes(term)));
-  $('#tableCount').textContent=`${rows.length} z ${state.questions.length}`;$('#questionRows').innerHTML=rows.map(q=>{const p=record(q.nr),on=isMastered(q);return `<tr><td>${q.nr}</td><td>${escapeHtml(q.dzial)}</td><td>${escapeHtml(q.pytanie)}</td><td class="answer-cell"><b>${q.poprawna}.</b> ${escapeHtml(q[q.poprawna.toLowerCase()])}</td><td class="mini-stats">✓ ${p.correct_count||0} &nbsp; ✕ ${p.wrong_count||0}</td><td><button class="status-toggle ${on?'on':''}" data-nr="${q.nr}">${on?'✓ Opanowane':'Do nauki'}</button></td></tr>`}).join('');
+  $('#tableCount').textContent=`${rows.length} z ${state.questions.length}`;$('#questionRows').innerHTML=rows.map(q=>{const p=record(q.nr),on=isMastered(q),score=scoreFor(q);return `<tr><td>${q.nr}</td><td>${escapeHtml(q.dzial)}</td><td>${escapeHtml(q.pytanie)}</td><td class="answer-cell"><b>${q.poprawna}.</b> ${escapeHtml(q[q.poprawna.toLowerCase()])}</td><td class="mini-stats"><b class="${score.percent===null?'':score.percent>=70?'score-pass':'score-fail'}">${score.percent===null?'—':score.percent+'%'}</b><br>${score.correct}/${score.attempts} poprawnych<br><span>✓ ${score.correct} &nbsp; ✕ ${score.wrong}</span></td><td><button class="status-toggle ${on?'on':''}" data-nr="${q.nr}">${on?'✓ Opanowane':'Do nauki'}</button></td></tr>`}).join('');
   $$('.status-toggle').forEach(button=>button.addEventListener('click',()=>{const q=state.questions.find(x=>x.nr===Number(button.dataset.nr));setMastered(q,!isMastered(q))}));
 }
 ['#tableSearch','#tableSection','#tableStatus'].forEach(id=>$(id).addEventListener(id==='#tableSearch'?'input':'change',renderTable));

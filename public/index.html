@@ -38,6 +38,8 @@
           <option value="learning">Tylko do nauki</option>
           <option value="mastered">Tylko opanowane</option>
           <option value="errors">Najczęściej błędne</option>
+          <option value="lowAttempts">Mało odpytane (&lt; 3 próby)</option>
+          <option value="lowScore">Wynik poniżej 70%</option>
         </select></label>
         <button id="startRandom" class="primary">Losowa kolejność</button>
         <button id="startSequential">Po kolei</button>
@@ -51,6 +53,7 @@
 
       <article id="questionCard" class="question panel hidden">
         <div class="question-meta"><span id="questionSection" class="badge"></span><span id="questionNumber"></span></div>
+        <div id="questionScore" class="question-score"></div>
         <div class="progress"><span id="progressFill"></span></div>
         <h2 id="questionText"></h2>
         <div id="answers" class="answers"></div>
