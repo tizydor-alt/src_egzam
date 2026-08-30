@@ -45,6 +45,18 @@ async function answer(q,answer){state.answered.set(q.nr,answer);showQuestion();t
 $('#prevQuestion').addEventListener('click',()=>{if(state.index>0){state.index--;showQuestion()}});$('#nextQuestion').addEventListener('click',()=>{if(state.index<state.active.length-1){state.index++;showQuestion()}else{$('#questionCard').classList.add('hidden');$('#emptyQuiz').classList.remove('hidden');$('#emptyQuiz h2').textContent=`Sesja zakończona · ${state.answered.size} odpowiedzi`;$('#emptyQuiz p').textContent='Wyniki zostały zapisane w bazie D1.'}});
 
 function updateMasterButton(q){const on=isMastered(q),button=$('#masterCurrent');button.classList.toggle('on',on);button.textContent=on?'✓ Opanowane':'Oznacz jako opanowane';button.onclick=()=>setMastered(q,!on)}
+function explanationPrompt(q){return `Proszę wyjaśnij poniższe pytanie egzaminacyjne SRC prostym i precyzyjnym językiem.\n\nPytanie nr ${q.nr} (${q.dzial}):\n${q.pytanie}\n\nA. ${q.a}\nB. ${q.b}\nC. ${q.c}\n\nWedług klucza poprawna odpowiedź to: ${q.poprawna}. ${q[q.poprawna.toLowerCase()]}\n\nWyjaśnij:\n1. dlaczego ta odpowiedź jest prawidłowa,\n2. dlaczego pozostałe odpowiedzi są błędne,\n3. jaką zasadę lub skojarzenie warto zapamiętać na egzamin.\n\nJeśli podejrzewasz, że wskazany klucz jest błędny lub nieaktualny, zaznacz to wyraźnie.`}
+async function copyCurrentQuestion(){
+  const q=state.active[state.index];if(!q)return;
+  const text=explanationPrompt(q);
+  try{
+    await navigator.clipboard.writeText(text);
+  }catch{
+    const area=document.createElement('textarea');area.value=text;area.style.position='fixed';area.style.opacity='0';document.body.appendChild(area);area.select();document.execCommand('copy');area.remove();
+  }
+  toast(`Skopiowano pytanie nr ${q.nr} z odpowiedziami`);
+}
+$('#copyQuestion').addEventListener('click',copyCurrentQuestion);
 async function setMastered(q,mastered){const previous=isMastered(q),p=record(q.nr);p.mastered=mastered?1:0;p.initial=false;state.progress.set(q.nr,p);renderStats();renderTable();if(state.active[state.index]?.nr===q.nr)updateMasterButton(q);try{await api('/api/progress',{method:'POST',body:JSON.stringify({questionNr:q.nr,mastered})});toast(mastered?'Oznaczono jako opanowane':'Przeniesiono do nauki')}catch(error){p.mastered=previous?1:0;renderStats();renderTable();toast(`Nie zapisano: ${error.message}`)}}
 
 function renderTable(){
