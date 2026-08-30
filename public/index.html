@@ -28,6 +28,7 @@
     <nav class="tabs" aria-label="Widok aplikacji">
       <button class="tab active" data-view="quiz">Quiz</button>
       <button class="tab" data-view="table">Tabela pytań</button>
+      <button class="tab" data-view="statistics">Statystyki</button>
     </nav>
 
     <section id="quizView" class="view">
@@ -81,6 +82,32 @@
         <table>
           <thead><tr><th>Nr</th><th>Dział</th><th>Pytanie</th><th>Poprawna odpowiedź</th><th>Wyniki</th><th>Opanowane</th></tr></thead>
           <tbody id="questionRows"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="statisticsView" class="view hidden">
+      <div class="panel statistics-intro">
+        <h2>Postęp według działów</h2>
+        <p>„Utrwalone wynikiem” oznacza minimum 3 próby i skuteczność co najmniej 70%. Ręczny status „opanowane” jest liczony osobno.</p>
+      </div>
+      <div id="sectionStats" class="section-stats"></div>
+
+      <div class="toolbar panel table-tools statistics-tools">
+        <label class="search">Szukaj<input id="statsSearch" type="search" placeholder="Numer lub fragment pytania…"></label>
+        <label>Dział<select id="statsSection"><option value="all">Wszystkie działy</option></select></label>
+        <label>Sortowanie<select id="statsSort">
+          <option value="weakest">Najsłabszy wynik</option>
+          <option value="fewest">Najmniej prób</option>
+          <option value="most">Najwięcej prób</option>
+          <option value="number">Numer pytania</option>
+        </select></label>
+        <span id="statsCount" class="result-count"></span>
+      </div>
+      <div class="table-wrap panel statistics-table">
+        <table>
+          <thead><tr><th>Nr</th><th>Dział</th><th>Pytanie</th><th>Próby</th><th>Poprawne</th><th>Błędy</th><th>Skuteczność</th><th>Status</th></tr></thead>
+          <tbody id="statsQuestionRows"></tbody>
         </table>
       </div>
     </section>

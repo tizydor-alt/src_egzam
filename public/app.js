@@ -13,8 +13,8 @@ async function init(){
     state.questions=questionData.questions;progressData.progress.forEach(p=>state.progress.set(p.question_nr,p));
     state.questions.forEach(q=>{if(q.initialMastered&&!state.progress.has(q.nr))state.progress.set(q.nr,{question_nr:q.nr,mastered:1,correct_count:0,wrong_count:0,initial:true})});
     const sections=[...new Set(state.questions.map(q=>q.dzial))];
-    for(const select of [$('#quizSection'),$('#tableSection')])sections.forEach(s=>select.add(new Option(s,s)));
-    $('#syncState').textContent=`Zapis D1 · ${progressData.user}`;$('#syncState').classList.add('ok');renderStats();renderTable();
+    for(const select of [$('#quizSection'),$('#tableSection'),$('#statsSection')])sections.forEach(s=>select.add(new Option(s,s)));
+    $('#syncState').textContent=`Zapis D1 · ${progressData.user}`;$('#syncState').classList.add('ok');renderStats();renderTable();renderStatistics();
   }catch(error){$('#syncState').textContent='Brak połączenia z bazą';$('#syncState').classList.add('error');toast(error.message)}
 }
 
@@ -25,7 +25,7 @@ function renderStats(){
   $('#statAccuracy').textContent=total?`${Math.round(correct/total*100)}%`:'—';$('#statAnswered').textContent=total;
 }
 
-$$('.tab').forEach(tab=>tab.addEventListener('click',()=>{$$('.tab').forEach(x=>x.classList.toggle('active',x===tab));$('#quizView').classList.toggle('hidden',tab.dataset.view!=='quiz');$('#tableView').classList.toggle('hidden',tab.dataset.view!=='table');if(tab.dataset.view==='table')renderTable()}));
+$$('.tab').forEach(tab=>tab.addEventListener('click',()=>{const view=tab.dataset.view;$$('.tab').forEach(x=>x.classList.toggle('active',x===tab));$('#quizView').classList.toggle('hidden',view!=='quiz');$('#tableView').classList.toggle('hidden',view!=='table');$('#statisticsView').classList.toggle('hidden',view!=='statistics');if(view==='table')renderTable();if(view==='statistics')renderStatistics()}));
 
 function quizPool(){
   const section=$('#quizSection').value,mode=$('#quizMode').value;let pool=state.questions.filter(q=>section==='all'||q.dzial===section);
@@ -64,6 +64,26 @@ async function copyCurrentQuestion(){
 $('#copyQuestion').addEventListener('click',copyCurrentQuestion);
 async function setMastered(q,mastered){const previous=isMastered(q),p=record(q.nr);p.mastered=mastered?1:0;p.initial=false;state.progress.set(q.nr,p);renderStats();renderTable();if(state.active[state.index]?.nr===q.nr)updateMasterButton(q);try{await api('/api/progress',{method:'POST',body:JSON.stringify({questionNr:q.nr,mastered})});toast(mastered?'Oznaczono jako opanowane':'Przeniesiono do nauki')}catch(error){p.mastered=previous?1:0;renderStats();renderTable();toast(`Nie zapisano: ${error.message}`)}}
 
+function aggregateQuestions(questions){
+  const scores=questions.map(scoreFor),attempts=scores.reduce((sum,s)=>sum+s.attempts,0),correct=scores.reduce((sum,s)=>sum+s.correct,0),wrong=attempts-correct;
+  return{questions:questions.length,attempted:scores.filter(s=>s.attempts>0).length,attempts,correct,wrong,accuracy:attempts?Math.round(correct/attempts*100):null,mastered:questions.filter(isMastered).length,consolidated:scores.filter(s=>s.attempts>=3&&s.percent>=70).length};
+}
+function renderStatistics(){
+  if(!state.questions.length)return;
+  const sections=[...new Set(state.questions.map(q=>q.dzial))];
+  $('#sectionStats').innerHTML=sections.map(section=>{const data=aggregateQuestions(state.questions.filter(q=>q.dzial===section));return `<article class="section-stat panel"><div><span class="badge">${escapeHtml(section)}</span><strong>${data.accuracy===null?'—':data.accuracy+'%'}</strong><small>skuteczność</small></div><dl><div><dt>Pytania</dt><dd>${data.questions}</dd></div><div><dt>Odpytane</dt><dd>${data.attempted}/${data.questions}</dd></div><div><dt>Wszystkie próby</dt><dd>${data.attempts}</dd></div><div><dt>Poprawne</dt><dd>${data.correct}</dd></div><div><dt>Opanowane ręcznie</dt><dd>${data.mastered}</dd></div><div><dt>Utrwalone wynikiem</dt><dd>${data.consolidated}</dd></div></dl></article>`}).join('');
+
+  const term=$('#statsSearch').value.trim().toLocaleLowerCase('pl'),section=$('#statsSection').value,sort=$('#statsSort').value;
+  let rows=state.questions.filter(q=>(section==='all'||q.dzial===section)&&(!term||String(q.nr)===term||q.pytanie.toLocaleLowerCase('pl').includes(term)));
+  const percentValue=q=>scoreFor(q).percent??101;
+  if(sort==='weakest')rows.sort((a,b)=>percentValue(a)-percentValue(b)||scoreFor(a).attempts-scoreFor(b).attempts||a.nr-b.nr);
+  if(sort==='fewest')rows.sort((a,b)=>scoreFor(a).attempts-scoreFor(b).attempts||percentValue(a)-percentValue(b)||a.nr-b.nr);
+  if(sort==='most')rows.sort((a,b)=>scoreFor(b).attempts-scoreFor(a).attempts||a.nr-b.nr);
+  if(sort==='number')rows.sort((a,b)=>a.nr-b.nr);
+  $('#statsCount').textContent=`${rows.length} pytań`;
+  $('#statsQuestionRows').innerHTML=rows.map(q=>{const score=scoreFor(q),consolidated=score.attempts>=3&&score.percent>=70;return `<tr><td>${q.nr}</td><td>${escapeHtml(q.dzial)}</td><td>${escapeHtml(q.pytanie)}</td><td>${score.attempts}</td><td class="score-pass">${score.correct}</td><td class="${score.wrong?'score-fail':''}">${score.wrong}</td><td><b class="${score.percent===null?'':score.percent>=70?'score-pass':'score-fail'}">${score.percent===null?'—':score.percent+'%'}</b></td><td><span class="stats-status ${consolidated?'good':''}">${consolidated?'Utrwalone':isMastered(q)?'Opanowane ręcznie':'Do nauki'}</span></td></tr>`}).join('');
+}
+
 function renderTable(){
   const term=$('#tableSearch').value.trim().toLocaleLowerCase('pl'),section=$('#tableSection').value,status=$('#tableStatus').value;
   const rows=state.questions.filter(q=>(section==='all'||q.dzial===section)&&(status==='all'||(status==='mastered'&&isMastered(q))||(status==='learning'&&!isMastered(q)))&&(!term||String(q.nr)===term||q.pytanie.toLocaleLowerCase('pl').includes(term)));
@@ -71,5 +91,6 @@ function renderTable(){
   $$('.status-toggle').forEach(button=>button.addEventListener('click',()=>{const q=state.questions.find(x=>x.nr===Number(button.dataset.nr));setMastered(q,!isMastered(q))}));
 }
 ['#tableSearch','#tableSection','#tableStatus'].forEach(id=>$(id).addEventListener(id==='#tableSearch'?'input':'change',renderTable));
+['#statsSearch','#statsSection','#statsSort'].forEach(id=>$(id).addEventListener(id==='#statsSearch'?'input':'change',renderStatistics));
 function escapeHtml(value){return String(value).replace(/[&<>"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]))}
 init();
