@@ -1,7 +1,9 @@
 import { QUESTIONS } from './questions.js';
 
 const SESSION_SECONDS = 30 * 24 * 60 * 60;
-const PIN_ITERATIONS = 120000;
+// The free Workers plan allows only a small amount of CPU time per request.
+// WebCrypto PBKDF2 remains deliberately expensive, but must fit that limit.
+const PIN_ITERATIONS = 20000;
 const encoder = new TextEncoder();
 
 function json(data, status = 200, extraHeaders = {}) {
