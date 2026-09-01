@@ -8,13 +8,33 @@
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
+  <section id="authView" class="auth-view">
+    <div class="auth-card panel">
+      <div class="signal">SRC</div>
+      <p class="eyebrow">WŁASNY POSTĘP W NAUCE</p>
+      <h1>Quiz SRC</h1>
+      <p class="auth-lead">Wpisz swój login i 6-cyfrowy PIN. Jeśli nie masz konta, utwórz je tym samym formularzem.</p>
+      <form id="authForm">
+        <label>Login<input id="authUsername" name="username" autocomplete="username" minlength="3" maxlength="24" pattern="[A-Za-z0-9_-]+" required placeholder="np. tomasz"></label>
+        <label>PIN<input id="authPin" name="pin" type="password" inputmode="numeric" autocomplete="current-password" pattern="[0-9]{6}" minlength="6" maxlength="6" required placeholder="6 cyfr"></label>
+        <p id="authError" class="auth-error hidden"></p>
+        <div class="auth-actions">
+          <button type="submit" class="primary">Zaloguj się</button>
+          <button type="button" id="registerButton">Załóż konto</button>
+        </div>
+      </form>
+      <p class="auth-warning">Nie ma odzyskiwania ani zmiany PIN-u. Zapisz go w bezpiecznym miejscu.</p>
+    </div>
+  </section>
+
+  <div id="appShell" class="hidden">
   <header class="hero">
     <div>
       <p class="eyebrow">NAUKA DO EGZAMINU RADIOWEGO</p>
       <h1>Quiz SRC</h1>
       <p class="subtitle">350 pytań · trwały postęp · trzy działy</p>
     </div>
-    <span id="syncState" class="sync">Łączenie z bazą…</span>
+    <div class="user-bar"><span id="syncState" class="sync">Łączenie z bazą…</span><button id="logoutButton">Wyloguj</button></div>
   </header>
 
   <main>
@@ -112,6 +132,7 @@
       </div>
     </section>
   </main>
+  </div>
 
   <div id="toast" role="status" aria-live="polite"></div>
   <script type="module" src="/app.js"></script>

@@ -7,16 +7,35 @@ function record(nr){return state.progress.get(nr)||{question_nr:nr,mastered:0,co
 function isMastered(q){return Boolean(record(q.nr).mastered)}
 function scoreFor(q){const p=record(q.nr),correct=p.correct_count||0,wrong=p.wrong_count||0,attempts=correct+wrong;return{correct,wrong,attempts,percent:attempts?Math.round(correct/attempts*100):null}}
 
-async function init(){
+async function loadApp(){
   try{
     const [questionData,progressData]=await Promise.all([api('/api/questions'),api('/api/progress')]);
     state.questions=questionData.questions;progressData.progress.forEach(p=>state.progress.set(p.question_nr,p));
-    state.questions.forEach(q=>{if(q.initialMastered&&!state.progress.has(q.nr))state.progress.set(q.nr,{question_nr:q.nr,mastered:1,correct_count:0,wrong_count:0,initial:true})});
     const sections=[...new Set(state.questions.map(q=>q.dzial))];
     for(const select of [$('#quizSection'),$('#tableSection'),$('#statsSection')])sections.forEach(s=>select.add(new Option(s,s)));
-    $('#syncState').textContent=`Zapis D1 · ${progressData.user}`;$('#syncState').classList.add('ok');renderStats();renderTable();renderStatistics();
+    $('#syncState').textContent=`Konto: ${progressData.user}`;$('#syncState').classList.add('ok');$('#authView').classList.add('hidden');$('#appShell').classList.remove('hidden');renderStats();renderTable();renderStatistics();
   }catch(error){$('#syncState').textContent='Brak połączenia z bazą';$('#syncState').classList.add('error');toast(error.message)}
 }
+
+async function init(){
+  try{
+    const session=await api('/api/auth/session');
+    if(session.authenticated)await loadApp();
+  }catch(error){showAuthError(error.message)}
+}
+
+function showAuthError(message){const error=$('#authError');error.textContent=message;error.classList.remove('hidden')}
+function clearAuthError(){$('#authError').classList.add('hidden')}
+async function authenticate(mode){
+  clearAuthError();const username=$('#authUsername').value.trim(),pin=$('#authPin').value.trim();
+  if(!/^[A-Za-z0-9_-]{3,24}$/.test(username)||!/^\d{6}$/.test(pin))return showAuthError('Login musi mieć 3–24 znaki, a PIN dokładnie 6 cyfr.');
+  const buttons=$$('#authForm button');buttons.forEach(button=>button.disabled=true);
+  try{await api(`/api/auth/${mode}`,{method:'POST',body:JSON.stringify({username,pin})});await loadApp();}
+  catch(error){showAuthError(error.message)}finally{buttons.forEach(button=>button.disabled=false)}
+}
+$('#authForm').addEventListener('submit',event=>{event.preventDefault();authenticate('login')});
+$('#registerButton').addEventListener('click',()=>authenticate('register'));
+$('#logoutButton').addEventListener('click',async()=>{try{await api('/api/auth/logout',{method:'POST'});}finally{location.reload()}});
 
 function renderStats(){
   const rows=state.questions.map(q=>record(q.nr));const mastered=state.questions.filter(isMastered).length;
