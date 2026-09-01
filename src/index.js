@@ -95,29 +95,6 @@ async function authenticatedUser(env, request) {
 }
 
 async function authRoute(request, env, url) {
-  if (request.method === 'GET' && url.pathname === '/api/auth/diagnostics') {
-    const checks = {};
-    try {
-      await env.DB.prepare('SELECT username, pin_hash, pin_salt, failed_attempts, locked_until FROM users LIMIT 1').first();
-      checks.users = 'ok';
-    } catch (error) {
-      checks.users = String(error?.message || error);
-    }
-    try {
-      await env.DB.prepare('SELECT token_hash, username, expires_at FROM sessions LIMIT 1').first();
-      checks.sessions = 'ok';
-    } catch (error) {
-      checks.sessions = String(error?.message || error);
-    }
-    try {
-      await hashPin('000000', 'diagnostic-salt');
-      checks.pinHash = 'ok';
-    } catch (error) {
-      checks.pinHash = String(error?.message || error);
-    }
-    return json({ checks });
-  }
-
   if (request.method === 'GET' && url.pathname === '/api/auth/session') {
     const username = await authenticatedUser(env, request);
     return json({ authenticated: Boolean(username), username });
