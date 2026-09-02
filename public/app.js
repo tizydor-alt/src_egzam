@@ -1,4 +1,4 @@
-const state={questions:[],progress:new Map(),active:[],index:0,answered:new Map()};
+const state={questions:[],progress:new Map(),active:[],index:0,answered:new Map(),shownQuestionNr:null,shownAt:0};
 const $=s=>document.querySelector(s);const $$=s=>[...document.querySelectorAll(s)];
 
 function toast(message){const el=$('#toast');el.textContent=message;el.classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.classList.remove('show'),2200)}
@@ -59,13 +59,13 @@ function start(shuffle){state.active=quizPool();if(!state.active.length)return t
 $('#startRandom').addEventListener('click',()=>start(true));$('#startSequential').addEventListener('click',()=>start(false));
 
 function showQuestion(){
-  const q=state.active[state.index],chosen=state.answered.get(q.nr),score=scoreFor(q);$('#questionSection').textContent=q.dzial;$('#questionNumber').textContent=`Nr ${q.nr} · ${state.index+1}/${state.active.length}`;$('#questionScore').innerHTML=`<span>Próby <b>${score.attempts}</b></span><span>Poprawne <b>${score.correct}</b></span><span>Wynik <b class="${score.percent===null?'':score.percent>=70?'score-pass':'score-fail'}">${score.percent===null?'—':score.percent+'%'}</b></span>`;$('#progressFill').style.width=`${(state.index+1)/state.active.length*100}%`;$('#questionText').textContent=q.pytanie;
+  const q=state.active[state.index],chosen=state.answered.get(q.nr),score=scoreFor(q);if(!chosen&&state.shownQuestionNr!==q.nr){state.shownQuestionNr=q.nr;state.shownAt=performance.now()}$('#questionSection').textContent=q.dzial;$('#questionNumber').textContent=`Nr ${q.nr} · ${state.index+1}/${state.active.length}`;$('#questionScore').innerHTML=`<span>Próby <b>${score.attempts}</b></span><span>Poprawne <b>${score.correct}</b></span><span>Wynik <b class="${score.percent===null?'':score.percent>=70?'score-pass':'score-fail'}">${score.percent===null?'—':score.percent+'%'}</b></span>`;$('#progressFill').style.width=`${(state.index+1)/state.active.length*100}%`;$('#questionText').textContent=q.pytanie;
   $('#answers').innerHTML=['A','B','C'].map(letter=>`<button class="answer ${chosen&&letter===q.poprawna?'correct':''} ${chosen===letter&&letter!==q.poprawna?'wrong':''}" data-answer="${letter}" ${chosen?'disabled':''}><b>${letter}.</b><span>${escapeHtml(q[letter.toLowerCase()])}</span></button>`).join('');
   $$('.answer').forEach(btn=>btn.addEventListener('click',()=>answer(q,btn.dataset.answer)));const fb=$('#feedback');fb.className='feedback hidden';if(chosen)showFeedback(q,chosen);
   updateMasterButton(q);$('#prevQuestion').disabled=state.index===0;$('#nextQuestion').textContent=state.index===state.active.length-1?'Zakończ':'Dalej';
 }
 function showFeedback(q,answer){const ok=answer===q.poprawna,fb=$('#feedback');fb.className=`feedback ${ok?'ok':'bad'}`;fb.textContent=ok?'✓ Poprawna odpowiedź':`✕ Poprawna odpowiedź: ${q.poprawna}. ${q[q.poprawna.toLowerCase()]}`}
-async function answer(q,answer){state.answered.set(q.nr,answer);showQuestion();try{const result=await api('/api/answer',{method:'POST',body:JSON.stringify({questionNr:q.nr,answer})});const p=record(q.nr);p.correct_count=(p.correct_count||0)+(result.correct?1:0);p.wrong_count=(p.wrong_count||0)+(result.correct?0:1);p.last_answer=answer;state.progress.set(q.nr,p);renderStats();showQuestion()}catch(error){toast(error.message)}}
+async function answer(q,answer){const durationMs=state.shownQuestionNr===q.nr&&state.shownAt?Math.round(performance.now()-state.shownAt):0;state.answered.set(q.nr,answer);showQuestion();try{const result=await api('/api/answer',{method:'POST',body:JSON.stringify({questionNr:q.nr,answer,durationMs})});const p=record(q.nr);p.correct_count=(p.correct_count||0)+(result.correct?1:0);p.wrong_count=(p.wrong_count||0)+(result.correct?0:1);p.last_answer=answer;p.total_answer_ms=(p.total_answer_ms||0)+(result.durationMs||0);p.timed_attempts=(p.timed_attempts||0)+(result.durationMs?1:0);state.progress.set(q.nr,p);renderStats();renderStatistics();showQuestion()}catch(error){toast(error.message)}}
 $('#prevQuestion').addEventListener('click',()=>{if(state.index>0){state.index--;showQuestion()}});$('#nextQuestion').addEventListener('click',()=>{if(state.index<state.active.length-1){state.index++;showQuestion()}else{$('#questionCard').classList.add('hidden');$('#emptyQuiz').classList.remove('hidden');$('#emptyQuiz h2').textContent=`Sesja zakończona · ${state.answered.size} odpowiedzi`;$('#emptyQuiz p').textContent='Wyniki zostały zapisane w bazie D1.'}});
 
 function updateMasterButton(q){const on=isMastered(q),button=$('#masterCurrent');button.classList.toggle('on',on);button.textContent=on?'✓ Opanowane':'Oznacz jako opanowane';button.onclick=()=>setMastered(q,!on)}
@@ -87,8 +87,17 @@ function aggregateQuestions(questions){
   const scores=questions.map(scoreFor),attempts=scores.reduce((sum,s)=>sum+s.attempts,0),correct=scores.reduce((sum,s)=>sum+s.correct,0),wrong=attempts-correct;
   return{questions:questions.length,attempted:scores.filter(s=>s.attempts>0).length,attempts,correct,wrong,accuracy:attempts?Math.round(correct/attempts*100):null,mastered:questions.filter(isMastered).length,consolidated:scores.filter(s=>s.attempts>=3&&s.percent>=70).length};
 }
+function attemptsNeeded(q){const score=scoreFor(q);if(score.attempts>=3&&score.percent>=70)return 0;const forMinimum=Math.max(0,3-score.attempts);const forAccuracy=Math.max(0,Math.ceil((.7*score.attempts-score.correct)/.3));return Math.max(1,forMinimum,forAccuracy)}
+function formatDuration(ms){const minutes=Math.max(1,Math.round(ms/60000)),hours=Math.floor(minutes/60),rest=minutes%60;return hours?`${hours} godz. ${rest} min`:`${rest} min`}
+function renderTimeEstimate(){
+  const records=[...state.progress.values()],timedAttempts=records.reduce((sum,p)=>sum+(p.timed_attempts||0),0),totalMs=records.reduce((sum,p)=>sum+(p.total_answer_ms||0),0),remainingAttempts=state.questions.reduce((sum,q)=>sum+attemptsNeeded(q),0),el=$('#timeEstimate');
+  if(timedAttempts<15){el.innerHTML=`<div><p class="eyebrow">ESTYMACJA CZASU NAUKI</p><h3>Zbieramy dane</h3><p>Odpowiedz jeszcze na <b>${15-timedAttempts}</b> ${15-timedAttempts===1?'pytanie':'pytań'}, aby otrzymać pierwszą estymację.</p></div><div class="estimate-metric"><strong>${timedAttempts}/15</strong><span>zmierzonych odpowiedzi</span></div>`;return}
+  const averageMs=totalMs/timedAttempts,estimateMs=averageMs*remainingAttempts,consolidated=state.questions.filter(q=>attemptsNeeded(q)===0).length;
+  el.innerHTML=`<div><p class="eyebrow">ESTYMACJA CZASU NAUKI</p><h3>${formatDuration(estimateMs)}</h3><p>Szacowany czas do utrwalenia wszystkich pytań. Wynik aktualizuje się wraz z Twoją nauką.</p></div><div class="estimate-details"><div><strong>${Math.round(averageMs/1000)} s</strong><span>średnio na odpowiedź</span></div><div><strong>${remainingAttempts}</strong><span>szacowanych prób</span></div><div><strong>${consolidated}/${state.questions.length}</strong><span>utrwalonych pytań</span></div></div>`;
+}
 function renderStatistics(){
   if(!state.questions.length)return;
+  renderTimeEstimate();
   const sections=[...new Set(state.questions.map(q=>q.dzial))];
   $('#sectionStats').innerHTML=sections.map(section=>{const data=aggregateQuestions(state.questions.filter(q=>q.dzial===section));return `<article class="section-stat panel"><div><span class="badge">${escapeHtml(section)}</span><strong>${data.accuracy===null?'—':data.accuracy+'%'}</strong><small>skuteczność</small></div><dl><div><dt>Pytania</dt><dd>${data.questions}</dd></div><div><dt>Odpytane</dt><dd>${data.attempted}/${data.questions}</dd></div><div><dt>Wszystkie próby</dt><dd>${data.attempts}</dd></div><div><dt>Poprawne</dt><dd>${data.correct}</dd></div><div><dt>Opanowane ręcznie</dt><dd>${data.mastered}</dd></div><div><dt>Utrwalone wynikiem</dt><dd>${data.consolidated}</dd></div></dl></article>`}).join('');
 

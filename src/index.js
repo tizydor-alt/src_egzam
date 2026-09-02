@@ -168,7 +168,7 @@ export default {
 
       if (request.method === 'GET' && url.pathname === '/api/progress') {
         const { results } = await env.DB.prepare(
-          'SELECT question_nr, mastered, correct_count, wrong_count, last_answer, updated_at FROM progress WHERE user_id = ?'
+          'SELECT question_nr, mastered, correct_count, wrong_count, last_answer, total_answer_ms, timed_attempts, updated_at FROM progress WHERE user_id = ?'
         ).bind(user).all();
         return json({ user, progress: results });
       }
@@ -190,19 +190,23 @@ export default {
         const body = await bodyOf(request);
         const nr = Number(body?.questionNr);
         const answer = String(body?.answer || '').toUpperCase();
+        const rawDuration = Number(body?.durationMs);
+        const durationMs = Number.isFinite(rawDuration) && rawDuration > 0 ? Math.min(600000, Math.max(500, Math.round(rawDuration))) : 0;
         const question = QUESTIONS.find(q => q.nr === nr);
         if (!question || !['A', 'B', 'C'].includes(answer)) return json({ error: 'Nieprawidłowa odpowiedź.' }, 400);
         const correct = answer === question.poprawna;
         await env.DB.prepare(`
-          INSERT INTO progress (user_id, question_nr, correct_count, wrong_count, last_answer, updated_at)
-          VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+          INSERT INTO progress (user_id, question_nr, correct_count, wrong_count, last_answer, total_answer_ms, timed_attempts, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
           ON CONFLICT(user_id, question_nr) DO UPDATE SET
             correct_count = correct_count + excluded.correct_count,
             wrong_count = wrong_count + excluded.wrong_count,
             last_answer = excluded.last_answer,
+            total_answer_ms = total_answer_ms + excluded.total_answer_ms,
+            timed_attempts = timed_attempts + excluded.timed_attempts,
             updated_at = CURRENT_TIMESTAMP
-        `).bind(user, nr, correct ? 1 : 0, correct ? 0 : 1, answer).run();
-        return json({ ok: true, correct, correctAnswer: question.poprawna });
+        `).bind(user, nr, correct ? 1 : 0, correct ? 0 : 1, answer, durationMs, durationMs ? 1 : 0).run();
+        return json({ ok: true, correct, correctAnswer: question.poprawna, durationMs });
       }
 
       return json({ error: 'Nie znaleziono.' }, 404);
